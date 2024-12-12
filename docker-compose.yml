@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123456
+    ports:
+      - "5431:5432"  # Проброс порта 5432 контейнера на 5431 хоста
+    volumes:
+      - postgres_data:/var/lib/postgresql/data  # Персистентное хранилище для данных
+
+volumes:
+  postgres_data:
