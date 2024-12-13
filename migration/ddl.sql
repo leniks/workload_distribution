@@ -22,8 +22,9 @@ COMMENT ON TABLE subjects IS 'Таблица, содержащая информ�
 -- Таблица Преподаватель
 CREATE TABLE teachers (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL
-    available_load INT NOT NULL
+    name VARCHAR(100) NOT NULL,
+    occupied_load INT NOT NULL DEFAULT 0,
+    max_load INT NOT NULL
 );
 
 COMMENT ON TABLE teachers IS 'Таблица, содержащая информацию о преподавателях';
@@ -42,7 +43,7 @@ COMMENT ON TABLE loads IS 'Таблица, содержащая информац
 -- Таблица Компетенция
 CREATE TABLE competencies (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL -- Пример Enum
+    name VARCHAR(100) NOT NULL
 );
 
 COMMENT ON TABLE competencies IS 'Таблица, содержащая информацию о компетенциях';
@@ -62,8 +63,6 @@ CREATE TABLE competencies_subjects (
     competence_id INT REFERENCES competencies(id) ON DELETE CASCADE,
     subject_id INT REFERENCES subjects(id) ON DELETE CASCADE,
     PRIMARY KEY (competence_id, subject_id)
---    FOREIGN KEY (competence_id) REFERENCES competencies(id) ON DELETE CASCADE,
---    FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE
 );
 
 COMMENT ON TABLE competencies_subjects IS 'Промежуточная таблица для связи предметов и компетенций';
@@ -73,9 +72,53 @@ CREATE TABLE competencies_teachers (
     competence_id INT REFERENCES competencies(id) ON DELETE CASCADE,
     teacher_id INT REFERENCES teachers(id) ON DELETE CASCADE,
     PRIMARY KEY (competence_id, teacher_id)
---    FOREIGN KEY (competence_id) REFERENCES competencies(id) ON DELETE CASCADE,
---    FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE CASCADE
 );
 
 COMMENT ON TABLE competencies_teachers IS 'Промежуточная таблица для связи преподавателей и компетенций';
+
+CREATE OR REPLACE PROCEDURE add_subject(
+    name_p TEXT,
+    semester_number_p INT,
+    competence_names TEXT
+)
+LANGUAGE plpgsql AS $$
+DECLARE
+    subject_id INT;
+    competence_name TEXT;
+BEGIN
+
+    INSERT INTO subjects (name, semester_number)
+    VALUES (name_p, semester_number_p)
+    RETURNING id INTO subject_id;
+
+    FOREACH competence_name IN ARRAY string_to_array(competence_names, ',')
+    LOOP
+        INSERT INTO competencies_subjects (competence_id, subject_id)
+        SELECT id, subject_id FROM competencies WHERE name = competence_name;
+    END LOOP;
+END;
+$$;
+
+CREATE OR REPLACE PROCEDURE add_teacher(
+    name_t TEXT,
+    available_workload_t INT,
+    competence_names TEXT
+)
+LANGUAGE plpgsql AS $$
+DECLARE
+    teacher_id INT;
+    competence_name TEXT;
+BEGIN
+
+    INSERT INTO teachers (name, max_load)
+    VALUES (name_t, available_workload_t)
+    RETURNING id INTO teacher_id;
+
+    FOREACH competence_name IN ARRAY string_to_array(competence_names, ',')
+    LOOP
+        INSERT INTO competencies_teachers (competence_id, teacher_id)
+        SELECT id, teacher_id FROM competencies WHERE name = competence_name;
+    END LOOP;
+END;
+$$;
 

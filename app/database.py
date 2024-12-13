@@ -11,11 +11,16 @@ def get_connection():
         port=settings.DB_PORT
     )
 
-# Пример функции для выполнения запроса
 def execute_query(query, params=None):
     with get_connection() as conn:
         with conn.cursor() as cursor:
             cursor.execute(query, params)
             if query.strip().lower().startswith("select"):
                 return cursor.fetchall()
+            conn.commit()
+
+def execute_procedure(proc_name, params):
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.callproc(proc_name, params)
             conn.commit()
