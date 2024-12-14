@@ -1,5 +1,4 @@
 import psycopg2
-from dns.e164 import query
 
 from app.database import execute_query
 from app.database import get_connection
