@@ -24,3 +24,13 @@ def execute_procedure(proc_name, params):
         with conn.cursor() as cursor:
             cursor.callproc(proc_name, params)
             conn.commit()
+
+
+def execute_many(query, params_list):
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                cursor.executemany(query, params_list)
+                conn.commit()
+            except Exception as e:
+                print(f"Ошибка: {e}")
