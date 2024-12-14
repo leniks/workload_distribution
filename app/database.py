@@ -11,12 +11,19 @@ def get_connection():
         port=settings.DB_PORT
     )
 
+
 def execute_query(query, params=None):
     with get_connection() as conn:
         with conn.cursor() as cursor:
             cursor.execute(query, params)
-            if query.strip().lower().startswith("select"):
+
+            if query.strip().lower().startswith(("insert", "update", "delete")):
+                if cursor.description is not None:
+                    return cursor.fetchone()
+
+            elif query.strip().lower().startswith("select"):
                 return cursor.fetchall()
+
             conn.commit()
 
 def execute_procedure(proc_name, params):

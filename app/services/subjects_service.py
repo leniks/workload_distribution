@@ -16,7 +16,26 @@ class SubjectService:
         return execute_query(query)
 
     @classmethod
+    def get_subjects_comp(cls, subject_name):
+        query = """
+            SELECT c.name
+            FROM competencies c
+            JOIN competencies_subjects cs ON c.id = cs.competence_id
+            JOIN subjects s ON cs.subject_id = s.id
+            WHERE s.name = %s;
+            """
+        res = execute_query(query, (subject_name.strip(), ))
+        return  [competence[0] for competence in res]
+
+
+    @classmethod
     def insert_subject(cls, name: str, semestr_number: int, competences):
+        query1 = "SELECT * FROM subjects WHERE name = %s AND semester_number = %s;"
+        params = (name, semestr_number)
+        subject = execute_query(query1, params)
+
+        if subject:
+            return f"Предмет '{name}' уже существует."
         try:
             execute_procedure_subject(str(name), semestr_number, str(competences))
             return  "Предмет успешно добавлен!"

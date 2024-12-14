@@ -3,7 +3,9 @@ import psycopg2
 from app.database import execute_query
 from app.database import get_connection
 from app.database import execute_many
-from subjects_service import SubjectService
+from app.services.subjects_service import SubjectService
+from app.services.groups_service import GroupsService
+from app.services.teachers_service import TeacherService
 
 class LoadsService:
 
@@ -14,8 +16,19 @@ class LoadsService:
         return [row[0] for row in res]
 
     @classmethod
+    def get_loads_and_hours(cls):
+        query = "SELECT load_type, hours, subject_name FROM load_details;"
+        res = execute_query(query)
+        return [f'{row[0]}, {str(row[1])}ч., {row[2]}' for row in res]
+
+    @classmethod
     def get_subjects(cls):
         res = SubjectService.get_subjects()
+        return [row[0] for row in res]
+
+    @classmethod
+    def get_groups(cls):
+        res = GroupsService.get_groups_names()
         return [row[0] for row in res]
 
     @classmethod
@@ -42,13 +55,64 @@ class LoadsService:
 
             group_ids = []
             for group in groups:
-                query5 = "SELECT id FROM groups WHERE name = %s;"
+                query5 = "SELECT id FROM groups WHERE number = %s;"
                 params = (group,)
                 group_id = execute_query(query5, params)[0][0]
                 group_ids.append(group_id)
 
+            print(group_ids)
+            print(load_id)
             query6 = "INSERT INTO groups_loads (group_id, loads_id) VALUES (%s, %s);"
             params_list = [(group_id, load_id) for group_id in group_ids]
             execute_many(query6, params_list)
 
             return f"Нагрузка успешно добавлена."
+
+    @classmethod
+    def get_available_load(cls, teacher_id):
+        query = "SELECT get_available_load(%s);"
+        return execute_query(query, (teacher_id,))[0][0]
+
+    @classmethod
+    def connect_load_and_teacher(cls, load_type: str, subject: str, teacher: str):
+
+        set_of_subject_comp = set(SubjectService.get_subjects_comp(subject))
+        set_of_teacher_comp = set(TeacherService.get_teachers_comp(teacher))
+
+        if not set_of_subject_comp.issubset(set_of_teacher_comp):
+            return "Компетенции преподавателя не соответствуют нужным компетенциям для ведения предмета."
+
+        query_subject_id = "SELECT id FROM subjects WHERE name = %s;"
+        subject_id = execute_query(query_subject_id, (subject.strip(),))
+
+        query_required_load = "SELECT hours FROM loads WHERE load_type = %s AND subject_id = %s;"
+        required_load_params = (load_type, subject_id[0][0])
+        subject_required_load = execute_query(query_required_load, required_load_params)
+
+        subject_required_load = subject_required_load[0][0]
+        teachers_available_load = LoadsService.get_available_load(teacher)
+
+        if subject_required_load > teachers_available_load:
+            return "Количество доступных часов для преподавателя меньше, чем нужно для ведения предмета."
+
+        query_update_teacher = """
+            UPDATE teachers
+            SET occupied_load = occupied_load + %s
+            WHERE name = %s;
+        """
+        execute_query(query_update_teacher, (subject_required_load, teacher))
+
+        query_teacher_id = "SELECT id FROM teachers WHERE name = %s;"
+        teacher_id = execute_query(query_teacher_id, (teacher,))
+
+        query_load_id = "SELECT id FROM loads WHERE load_type = %s AND subject_id = %s;"
+        load_id = execute_query(query_load_id, (load_type, subject_id[0][0]))
+
+        query_update_load = """
+            UPDATE loads
+            SET teacher_id = %s
+            WHERE id = %s;
+        """
+        execute_query(query_update_load, (teacher_id[0][0], load_id[0][0]))
+
+        return "Нагрузка успешно назначена преподавателю."

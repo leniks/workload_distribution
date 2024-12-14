@@ -16,6 +16,24 @@ class TeacherService:
         return execute_query(query)
 
     @classmethod
+    def get_teachers_names(cls):
+        query = "SELECT name FROM teachers;"
+        teachers = execute_query(query)
+        return [res[0] for res in teachers]
+
+    @classmethod
+    def get_teachers_comp(cls, teacher_name):
+        query = """
+                SELECT c.name
+                FROM competencies c
+                JOIN competencies_teachers ct ON c.id = ct.competence_id
+                JOIN teachers t ON ct.teacher_id = t.id
+                WHERE t.name = %s;
+                """
+        res = execute_query(query, (teacher_name.strip(),))
+        return [competence[0] for competence in res]
+
+    @classmethod
     def insert_teacher(cls, name: str, available_workload: int, competences):
         try:
             execute_procedure_teacher(str(name), available_workload, str(competences))

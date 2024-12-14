@@ -8,6 +8,11 @@ class GroupsService:
         return execute_query(query)
 
     @classmethod
+    def get_groups_names(cls):
+        query = "SELECT number FROM groups;"
+        return execute_query(query)
+
+    @classmethod
     def insert_group(cls, number, student_count):
         query1 = "SELECT * FROM groups WHERE number = %s;"
         params = (number,)
