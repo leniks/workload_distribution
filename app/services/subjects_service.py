@@ -12,7 +12,7 @@ def execute_procedure_subject(name, semestr_number, competences):
 class SubjectService:
     @classmethod
     def get_subjects(cls):
-        query = "SELECT name FROM subjects;"
+        query = "SELECT * FROM subject_details;"
         return execute_query(query)
 
     @classmethod

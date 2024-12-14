@@ -28,11 +28,17 @@ def loads_handler():
         if st.button(label='Назначить преподавателя'):
             st.session_state.show_form_connect_load = True
 
+        if st.button(label='Удалить нагрузку'):
+            st.session_state.show_form_delete_load = True
+
     if 'show_form_add_load' not in st.session_state:
         st.session_state.show_form_add_load = False
 
     if 'show_form_connect_load' not in st.session_state:
         st.session_state.show_form_connect_load = False
+
+    if 'show_form_delete_load' not in st.session_state:
+        st.session_state.show_form_delete_load = False
 
     if st.session_state.show_form_add_load:
         if st.button(label='Скрыть форму добавления нагрузки'):
@@ -64,11 +70,16 @@ def loads_handler():
             st.rerun()
 
         with st.form(key='connect_load_form'):
-            load = st.selectbox("Выберите нагрузку:", LoadsService.get_loads_and_hours())
-            load_type = load.split(',')[0]
-            subject = load.split(',')[-1]
+            try:
+                load = st.selectbox("Выберите нагрузку:", LoadsService.get_loads_and_hours())
+                load_type = load.split(',')[0]
+                subject = load.split(',')[2]
+                status = load.split(',')[3]
 
-            teacher = st.selectbox("Выберите преподавателя:", TeacherService.get_teachers_names())
+                teacher = st.selectbox("Выберите преподавателя:", TeacherService.get_teachers_names())
+            except AttributeError:
+                st.text("Добавьте хотя бы одну нагрузку")
+
 
             submit_add_button = st.form_submit_button(label='Подтвердить назначение')
 
@@ -76,5 +87,28 @@ def loads_handler():
                 if not load or not teacher:
                     st.error("Пожалуйста, заполните все поля корректно.")
                 else:
-                    result = LoadsService.connect_load_and_teacher(load_type, subject, teacher)
+                    result = LoadsService.connect_load_and_teacher(load_type, subject, teacher, status)
+                    st.success(result)
+
+    if st.session_state.show_form_delete_load:
+        if st.button(label='Скрыть форму удаления нагрузки'):
+            st.session_state.show_form_delete_load = False
+            st.rerun()
+
+        with st.form(key='delete_load_form'):
+            try:
+                load = st.selectbox("Выберите нагрузку:", LoadsService.get_loads_and_hours())
+                load_type = load.split(',')[0]
+                subject = load.split(',')[2]
+
+            except AttributeError:
+                st.text("Добавьте хотя бы одну нагрузку")
+
+            submit_delete_button = st.form_submit_button(label='Подтвердить удаление')
+
+            if submit_delete_button:
+                if not load:
+                    st.error("Пожалуйста, заполните все поля корректно.")
+                else:
+                    result = LoadsService.delete_load(load_type, subject)
                     st.success(result)

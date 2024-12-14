@@ -1,4 +1,5 @@
 import psycopg2
+from dns.e164 import query
 
 from app.database import execute_query
 from app.database import get_connection
@@ -17,19 +18,9 @@ class LoadsService:
 
     @classmethod
     def get_loads_and_hours(cls):
-        query = "SELECT load_type, hours, subject_name FROM load_details;"
+        query = "SELECT load_type, hours, subject_name, connected FROM load_details;"
         res = execute_query(query)
-        return [f'{row[0]}, {str(row[1])}ч., {row[2]}' for row in res]
-
-    @classmethod
-    def get_subjects(cls):
-        res = SubjectService.get_subjects()
-        return [row[0] for row in res]
-
-    @classmethod
-    def get_groups(cls):
-        res = GroupsService.get_groups_names()
-        return [row[0] for row in res]
+        return [f'{row[0]}, {str(row[1])}ч., {row[2]}, {row[3]}' for row in res]
 
     @classmethod
     def get_loads(cls):
@@ -74,7 +65,9 @@ class LoadsService:
         return execute_query(query, (teacher_id,))[0][0]
 
     @classmethod
-    def connect_load_and_teacher(cls, load_type: str, subject: str, teacher: str):
+    def connect_load_and_teacher(cls, load_type: str, subject: str, teacher: str, status: str):
+        if status.strip() == 'распределена':
+            return "Выберите нераспределенную нагрузку."
 
         set_of_subject_comp = set(SubjectService.get_subjects_comp(subject))
         set_of_teacher_comp = set(TeacherService.get_teachers_comp(teacher))
@@ -110,9 +103,24 @@ class LoadsService:
 
         query_update_load = """
             UPDATE loads
-            SET teacher_id = %s
+            SET teacher_id = %s, connected = TRUE
             WHERE id = %s;
         """
         execute_query(query_update_load, (teacher_id[0][0], load_id[0][0]))
 
         return "Нагрузка успешно назначена преподавателю."
+
+    @classmethod
+    def delete_load(cls, load_type, subject):
+        query_subject_id = "SELECT id FROM subjects WHERE name = %s;"
+        subject_id = execute_query(query_subject_id, (subject.strip(),))[0][0]
+        try:
+            query = """
+            DELETE FROM loads 
+            WHERE load_type = %s AND subject_id = %s
+            """
+            params = (load_type, subject_id)
+            execute_query(query, params)
+            return "Нагрузка удалена, преподавательские часы освобождены"
+        except psycopg2.Error as err:
+            return f"Ошибка: {err}"

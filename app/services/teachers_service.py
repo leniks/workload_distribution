@@ -12,7 +12,7 @@ def execute_procedure_teacher(name, available_workload, competences):
 class TeacherService:
     @classmethod
     def get_teachers(cls):
-        query = "SELECT * FROM teachers;"
+        query = "SELECT * FROM teacher_details;"
         return execute_query(query)
 
     @classmethod

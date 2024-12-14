@@ -8,7 +8,8 @@ def get_subjects():
     subjects = SubjectService.get_subjects()
     if subjects:
         df = pd.DataFrame(subjects)
-        st.dataframe(df)
+        df.columns = ['Название предмета', 'Номер семестра', 'Требуемые компетенции']
+        st.dataframe(df, hide_index=True)
     else:
         st.write("Предметы не найдены.")
 

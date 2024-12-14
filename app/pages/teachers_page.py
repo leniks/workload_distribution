@@ -8,7 +8,8 @@ def get_teachers():
     teachers = TeacherService.get_teachers()
     if teachers:
         df = pd.DataFrame(teachers)
-        st.dataframe(df)
+        df.columns = ['Имя', 'Распределённая нагрузка', 'Максимальная нагрузка', 'Компетенции']
+        st.dataframe(df, hide_index=True)
     else:
         st.write("Преподаватели не найдены.")
 

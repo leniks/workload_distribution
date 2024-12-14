@@ -6,7 +6,8 @@ def get_groups():
     groups = GroupsService.get_groups()
     if groups:
         df = pd.DataFrame(groups)
-        st.dataframe(df)
+        df.columns = ['Номер группы', 'Количество человек']
+        st.dataframe(df, hide_index=True)
     else:
         st.write("Группы не найдены.")
 

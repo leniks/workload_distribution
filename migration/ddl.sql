@@ -8,6 +8,7 @@ DROP TABLE IF EXISTS competencies CASCADE;
 DROP TABLE IF EXISTS competencies_subjects CASCADE;
 DROP TABLE IF EXISTS competencies_teachers CASCADE;
 
+
 CREATE TYPE loads_enum AS ENUM ('Лекции', 'Практические занятия', 'Лабораторные работы');
 -- Таблица Группа
 CREATE TABLE groups (
@@ -15,16 +16,17 @@ CREATE TABLE groups (
     number VARCHAR(10) NOT NULL,
     student_count INT NOT NULL
 );
-
 COMMENT ON TABLE groups IS 'Таблица, содержащая информацию о группах студентов';
+
+
 -- Таблица Предмет
 CREATE TABLE subjects (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     semester_number INT NOT NULL
 );
-
 COMMENT ON TABLE subjects IS 'Таблица, содержащая информацию о предметах';
+
 
 -- Таблица Преподаватель
 CREATE TABLE teachers (
@@ -33,8 +35,8 @@ CREATE TABLE teachers (
     occupied_load INT NOT NULL DEFAULT 0,
     max_load INT NOT NULL
 );
-
 COMMENT ON TABLE teachers IS 'Таблица, содержащая информацию о преподавателях';
+
 
 -- Таблица Нагрузка
 CREATE TABLE loads (
@@ -42,18 +44,19 @@ CREATE TABLE loads (
     load_type loads_enum NOT NULL, -- лекции, практические занятия и т.д.
     subject_id INT REFERENCES subjects(id),
     teacher_id INT REFERENCES teachers(id),
-    hours INT NOT NULL
+    hours INT NOT NULL,
+    connected BOOLEAN DEFAULT FALSE
 );
-
 COMMENT ON TABLE loads IS 'Таблица, содержащая информацию о типах нагрузки и количестве часов';
+
 
 -- Таблица Компетенция
 CREATE TABLE competencies (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL
 );
-
 COMMENT ON TABLE competencies IS 'Таблица, содержащая информацию о компетенциях';
+
 
 -- Промежуточная таблица для связи групп и нагрузок
 CREATE TABLE groups_loads (
@@ -61,8 +64,8 @@ CREATE TABLE groups_loads (
     loads_id INT REFERENCES loads(id) ON DELETE CASCADE,
     PRIMARY KEY (group_id, loads_id)
 );
-
 COMMENT ON TABLE groups_loads IS 'Промежуточная таблица для связи групп и нагрузок';
+
 
 -- Промежуточная таблица для связи предметов и компетенций
 CREATE TABLE competencies_subjects (
@@ -70,8 +73,8 @@ CREATE TABLE competencies_subjects (
     subject_id INT REFERENCES subjects(id) ON DELETE CASCADE,
     PRIMARY KEY (competence_id, subject_id)
 );
-
 COMMENT ON TABLE competencies_subjects IS 'Промежуточная таблица для связи предметов и компетенций';
+
 
 -- Промежуточная таблица для связи преподавателей и компетенций
 CREATE TABLE competencies_teachers (
@@ -79,8 +82,8 @@ CREATE TABLE competencies_teachers (
     teacher_id INT REFERENCES teachers(id) ON DELETE CASCADE,
     PRIMARY KEY (competence_id, teacher_id)
 );
-
 COMMENT ON TABLE competencies_teachers IS 'Промежуточная таблица для связи преподавателей и компетенций';
+
 
 CREATE OR REPLACE PROCEDURE add_subject(
     name_p TEXT,
@@ -92,7 +95,6 @@ DECLARE
     subject_id INT;
     competence_name TEXT;
 BEGIN
-
     INSERT INTO subjects (name, semester_number)
     VALUES (name_p, semester_number_p)
     RETURNING id INTO subject_id;
@@ -105,6 +107,7 @@ BEGIN
 END;
 $$;
 
+
 CREATE OR REPLACE PROCEDURE add_teacher(
     name_t TEXT,
     available_workload_t INT,
@@ -115,11 +118,9 @@ DECLARE
     teacher_id INT;
     competence_name TEXT;
 BEGIN
-
     INSERT INTO teachers (name, max_load)
     VALUES (name_t, available_workload_t)
     RETURNING id INTO teacher_id;
-
     FOREACH competence_name IN ARRAY string_to_array(competence_names, ',')
     LOOP
         INSERT INTO competencies_teachers (competence_id, teacher_id)
@@ -128,13 +129,16 @@ BEGIN
 END;
 $$;
 
+
 CREATE OR REPLACE VIEW load_details AS
 SELECT
     l.load_type,
     l.hours,
     s.name AS subject_name,
     t.name AS teacher_name,
-    ARRAY_AGG(g.number) AS group_numbers
+    ARRAY_AGG(g.number) AS group_numbers,
+    CASE WHEN l.connected = TRUE THEN 'распределена'
+    ELSE 'не распределена' END as connected
 FROM
     loads l
 LEFT JOIN
@@ -148,6 +152,38 @@ LEFT JOIN
 GROUP BY
     l.id, l.load_type, l.hours, s.name, t.name;
 
+
+CREATE OR REPLACE VIEW teacher_details AS
+SELECT
+    t.name,
+    t.occupied_load,
+    t.max_load,
+    ARRAY_AGG(c.name) AS comp_names
+FROM
+    teachers t
+LEFT JOIN
+    competencies_teachers ct ON t.id = ct.teacher_id
+LEFT JOIN
+    competencies c ON ct.competence_id = c.id
+GROUP BY
+    t.id, t.name, t.occupied_load, t.max_load;
+
+
+CREATE OR REPLACE VIEW subject_details AS
+SELECT
+    s.name,
+    s.semester_number,
+    ARRAY_AGG(c.name) AS comp_names
+FROM
+    subjects s
+LEFT JOIN
+    competencies_subjects cs ON s.id = cs.subject_id
+LEFT JOIN
+    competencies c ON cs.competence_id = c.id
+GROUP BY
+    s.id, s.name, s.semester_number;
+
+
 CREATE OR REPLACE FUNCTION get_available_load(teacher_name TEXT)
 RETURNS INT AS $$
 DECLARE
@@ -160,5 +196,21 @@ BEGIN
     RETURN available_load;
 END;
 $$ LANGUAGE plpgsql;
-
 COMMENT ON FUNCTION get_available_load(TEXT) IS 'Функция, возвращающая доступную нагрузку для преподавателя по его ID';
+
+
+CREATE OR REPLACE FUNCTION update_teacher_load()
+RETURNS TRIGGER AS $$
+BEGIN
+    UPDATE teachers
+    SET occupied_load = occupied_load - OLD.hours
+    WHERE id = OLD.teacher_id;
+    RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE TRIGGER trg_update_teacher_load
+AFTER DELETE ON loads
+FOR EACH ROW
+EXECUTE FUNCTION update_teacher_load();

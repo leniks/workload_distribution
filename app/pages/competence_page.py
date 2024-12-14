@@ -6,7 +6,8 @@ def get_competencies():
     competencies = CompetenceService.get_competencies()
     if competencies:
         df = pd.DataFrame(competencies)
-        st.dataframe(df)
+        df.columns = ['Название компетенции']
+        st.dataframe(df, hide_index=True)
     else:
         st.write("Компетенции не найдены.")
 
