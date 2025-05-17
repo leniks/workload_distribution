@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 from app.services.loads_service import LoadsService
 from app.services.teachers_service import TeacherService
+from app.services.subjects_service import SubjectService
+from app.services.groups_service import GroupsService
 
 
 def get_loads():
@@ -11,6 +13,14 @@ def get_loads():
         st.dataframe(df)
     else:
         st.write("Нагрузки не найдены.")
+
+def get_groups():
+    result = GroupsService.get_groups()
+    return [res[0] for res in result]
+
+def get_subjects():
+    result = SubjectService.get_subjects()
+    return [res[0] for res in result]
 
 def loads_handler():
 
@@ -48,9 +58,9 @@ def loads_handler():
         with st.form(key='create_load_form'):
             load_type = st.selectbox("Выберите тип нагрузки:", LoadsService.get_loads_enum())
             hours = st.number_input("Введите количество часов:", min_value=1, step=1)
-            subjects = LoadsService.get_subjects()
+            subjects = get_subjects()
             subject = st.selectbox("Выберите предмет:", subjects)
-            groups = st.multiselect("Выберите группы:", LoadsService.get_groups())
+            groups = st.multiselect("Выберите группы:", get_groups())
 
             submit_add_button = st.form_submit_button(label='Подтвердить добавление')
 
